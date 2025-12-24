@@ -1,35 +1,53 @@
 from pydantic import BaseModel
 from typing import List, Optional
+from datetime import datetime
 
-# --- SCHEMAS DE ITEMS (CONTADORES) ---
+# --- SCHEMAS DE ITEMS ---
+
 class ItemBase(BaseModel):
     title: str
 
 class ItemCreate(ItemBase):
     pass
 
-# Clase para recibir actualizaciones de contador
+# ESTA ES LA CLAVE DEL ERROR 422
 class ItemUpdate(BaseModel):
-    count: int
+    # Al poner "= None", decimos que no es obligatorio enviarlo
+    title: str | None = None
+    count: int | None = None
+
+class ItemLog(BaseModel):
+    id: int
+    timestamp: datetime
+    
+    class Config:
+        from_attributes = True
 
 class Item(ItemBase):
     id: int
     count: int
     owner_id: int
-
+    # No metemos los logs aquí para no sobrecargar la lista principal
+    
     class Config:
         from_attributes = True
 
 # --- SCHEMAS DE USUARIOS ---
+
+class UserBase(BaseModel):
+    email: str | None = None
+    display_name: str | None = None
+
 class UserLogin(BaseModel):
     token: str
 
-class UserResponse(BaseModel):
+class UserCreate(UserBase):
+    firebase_uid: str
+
+class UserResponse(UserBase):
     id: int
     firebase_uid: str
-    email: Optional[str] = None
-    display_name: Optional[str] = None
-    items: List[Item] = [] # Ahora el usuario devolverá también sus items
+    items: List[Item] = []
 
     class Config:
         from_attributes = True
