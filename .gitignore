@@ -1,0 +1,11 @@
+# Entorno virtual
+venv/
+__pycache__/
+*.pyc
+
+# Base de datos (no se suele subir, mejor que cada entorno tenga la suya)
+*.db
+*.sqlite3
+
+# SECRETO DE FIREBASE (¡MUY IMPORTANTE!)
+serviceAccountKey.json
