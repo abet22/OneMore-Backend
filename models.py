@@ -1,49 +1,25 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime
-from sqlalchemy.orm import relationship, declarative_base
-from sqlalchemy.sql import func
-
-# Esta es la base de la que heredarán nuestros modelos
-Base = declarative_base()
+from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy.orm import relationship
+from database import Base
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    # Aquí guardaremos el ID que nos da Google/Firebase (ej: 'dKz2...')
-    firebase_uid = Column(String, unique=True, index=True, nullable=False)
+    firebase_uid = Column(String, unique=True, index=True)
     email = Column(String, unique=True, index=True)
     display_name = Column(String)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    # Relación: Un usuario tiene muchos Items
+    # Relación: Un usuario tiene muchos items
     items = relationship("Item", back_populates="owner")
 
 class Item(Base):
     __tablename__ = "items"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True) # Ej: "Cervezas", "Libros"
-    color = Column(String, default="#3B82F6") # Un azul por defecto
-    icon = Column(String, nullable=True) # Ej: "🍺"
-    active = Column(Boolean, default=True)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
-    # Clave foránea: A qué usuario pertenece esto
-    user_id = Column(Integer, ForeignKey("users.id"))
-    
-    # Relaciones
+    title = Column(String, index=True)  # Ej: "Cervezas 2024"
+    count = Column(Integer, default=0)  # Ej: 5
+    owner_id = Column(Integer, ForeignKey("users.id")) # Dueño del contador
+
+    # Relación: Un item pertenece a un dueño
     owner = relationship("User", back_populates="items")
-    entries = relationship("Entry", back_populates="item")
-
-class Entry(Base):
-    __tablename__ = "entries"
-
-    id = Column(Integer, primary_key=True, index=True)
-    amount = Column(Integer, default=1) # Por si quieres sumar de 2 en 2
-    timestamp = Column(DateTime(timezone=True), server_default=func.now()) # CUANDO ocurrió
-    
-    # Clave foránea: A qué Item pertenece este clic
-    item_id = Column(Integer, ForeignKey("items.id"))
-    
-    # Relación
-    item = relationship("Item", back_populates="entries")
