@@ -6,20 +6,22 @@ from datetime import datetime
 
 class ItemBase(BaseModel):
     title: str
+    # Añadimos description aquí o en ItemCreate, pero es útil tenerla base
+    description: str | None = None 
 
 class ItemCreate(ItemBase):
-    pass
+    # Aquí es donde el usuario decide si es secreto al crearlo
+    is_hidden: bool = False 
 
-# ESTA ES LA CLAVE DEL ERROR 422
 class ItemUpdate(BaseModel):
-    # Al poner "= None", decimos que no es obligatorio enviarlo
     title: str | None = None
+    description: str | None = None # Permitimos editar la descripción
     count: int | None = None
+    # No permitimos cambiar is_hidden en un update por seguridad (de momento)
 
 class ItemLog(BaseModel):
     id: int
     timestamp: datetime
-    
     class Config:
         from_attributes = True
 
@@ -27,13 +29,13 @@ class Item(ItemBase):
     id: int
     count: int
     owner_id: int
-    # No metemos los logs aquí para no sobrecargar la lista principal
+    is_hidden: bool # El frontend necesita saber si pintar el candado 🔒
     
     class Config:
         from_attributes = True
 
 # --- SCHEMAS DE USUARIOS ---
-
+# (Esto se queda igual que lo tenías)
 class UserBase(BaseModel):
     email: str | None = None
     display_name: str | None = None
@@ -48,6 +50,5 @@ class UserResponse(UserBase):
     id: int
     firebase_uid: str
     items: List[Item] = []
-
     class Config:
         from_attributes = True

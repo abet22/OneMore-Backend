@@ -6,6 +6,7 @@ import firebase_admin
 import models, schemas
 from database import engine, SessionLocal
 from models import Base, User, Item, ItemLog 
+from crypto_utils import encrypt_text, decrypt_text
 from typing import List 
 import os
 from dotenv import load_dotenv
@@ -85,18 +86,51 @@ def login_user(user_input: schemas.UserLogin, db: Session = Depends(get_db)):
 @app.get("/items", response_model=List[schemas.Item])
 def read_items(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     items = db.query(models.Item).filter(models.Item.owner_id == current_user.id).order_by(models.Item.position).all()
+    # Desencriptamos las descripciones si son ocultas para mostrarlas en el frontend
+    for item in items:
+        if item.is_hidden and item.description:
+            item.description = decrypt_text(item.description)
     return items
 
 @app.post("/items", response_model=schemas.Item)
 def create_item(item: schemas.ItemCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
-    new_item = models.Item(title=item.title, owner_id=current_user.id)
+    # Encriptar descripción si el item es oculto
+    desc_to_save = item.description
+    if item.is_hidden and item.description:
+        desc_to_save = encrypt_text(item.description)
+
+    new_item = models.Item(
+        title=item.title, 
+        description=desc_to_save, 
+        is_hidden=item.is_hidden,
+        owner_id=current_user.id
+    )
     db.add(new_item)
     db.commit()
     db.refresh(new_item)
+
+    # Desencriptar para la respuesta que va al frontend
+    if new_item.is_hidden and new_item.description:
+        new_item.description = decrypt_text(new_item.description)
+
     return new_item
 
 # --- NUEVA RUTA ESPECIAL: SUMAR Y REGISTRAR TIEMPO ---
 # Úsala en el botón "+1" del frontend en lugar del PUT genérico
+@app.get("/items/{item_id}", response_model=schemas.Item)
+def read_item(item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    db_item = db.query(models.Item).filter(models.Item.id == item_id).first()
+    if not db_item:
+        raise HTTPException(status_code=404, detail="Item no encontrado")
+    if db_item.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="No tienes permiso")
+    
+    # Desencriptar descripción si es oculta
+    if db_item.is_hidden and db_item.description:
+        db_item.description = decrypt_text(db_item.description)
+        
+    return db_item
+
 @app.post("/items/{item_id}/increment", response_model=schemas.Item)
 def increment_item(item_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     # 1. Buscar el item y verificar dueño
@@ -117,6 +151,11 @@ def increment_item(item_id: int, db: Session = Depends(get_db), current_user: mo
     # 4. Confirmar cambios
     db.commit()
     db.refresh(db_item)
+
+    # Desencriptar descripción si es oculta
+    if db_item.is_hidden and db_item.description:
+        db_item.description = decrypt_text(db_item.description)
+
     return db_item
 
 # --- (Opcional) EDITAR MANUALMENTE ---
@@ -151,9 +190,21 @@ def update_item(
         db_item.title = item_update.title
     if item_update.count is not None:
         db_item.count = item_update.count
+    
+    # Actualizar descripción (encriptada si is_hidden=True)
+    if item_update.description is not None:
+        if db_item.is_hidden:
+            db_item.description = encrypt_text(item_update.description)
+        else:
+            db_item.description = item_update.description
         
     db.commit()
     db.refresh(db_item)
+
+    # Desencriptar para la respuesta
+    if db_item.is_hidden and db_item.description:
+        db_item.description = decrypt_text(db_item.description)
+
     return db_item
 
 @app.delete("/items/{item_id}")
@@ -199,6 +250,10 @@ def decrement_item(item_id: int, db: Session = Depends(get_db), current_user: mo
         db.commit()
         db.refresh(db_item)
     
+    # Desencriptar descripción si es oculta
+    if db_item.is_hidden and db_item.description:
+        db_item.description = decrypt_text(db_item.description)
+        
     return db_item
 
 # --- NUEVA RUTA: OBTENER HISTORIAL DE UN ITEM ---
