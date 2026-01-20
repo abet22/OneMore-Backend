@@ -191,12 +191,26 @@ def update_item(
     if item_update.count is not None:
         db_item.count = item_update.count
     
-    # Actualizar descripción (encriptada si is_hidden=True)
+    # Manejar cambio de privacidad e encriptación
+    # Primero obtenemos la descripción actual en claro
+    current_desc = db_item.description
+    if db_item.is_hidden and current_desc:
+        current_desc = decrypt_text(current_desc)
+    
+    # Si viene una nueva descripción, la usamos
     if item_update.description is not None:
+        current_desc = item_update.description
+        
+    # Si cambia el estado de is_hidden, lo actualizamos
+    if item_update.is_hidden is not None:
+        db_item.is_hidden = item_update.is_hidden
+        
+    # Guardamos la descripción (encriptada si is_hidden es True)
+    if current_desc is not None:
         if db_item.is_hidden:
-            db_item.description = encrypt_text(item_update.description)
+            db_item.description = encrypt_text(current_desc)
         else:
-            db_item.description = item_update.description
+            db_item.description = current_desc
         
     db.commit()
     db.refresh(db_item)

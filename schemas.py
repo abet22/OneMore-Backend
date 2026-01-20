@@ -17,7 +17,7 @@ class ItemUpdate(BaseModel):
     title: str | None = None
     description: str | None = None # Permitimos editar la descripción
     count: int | None = None
-    # No permitimos cambiar is_hidden en un update por seguridad (de momento)
+    is_hidden: bool | None = None # Permitimos cambiar la privacidad
 
 class ItemLog(BaseModel):
     id: int
