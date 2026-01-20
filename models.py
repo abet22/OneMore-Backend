@@ -21,6 +21,7 @@ class Item(Base):
     title = Column(String, index=True)
     count = Column(Integer, default=0)
     owner_id = Column(Integer, ForeignKey("users.id"))
+    position = Column(Integer, default=0) 
 
     # Relación: Un item pertenece a un usuario
     owner = relationship("User", back_populates="items")

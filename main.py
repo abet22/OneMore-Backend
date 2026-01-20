@@ -6,8 +6,11 @@ import firebase_admin
 import models, schemas
 from database import engine, SessionLocal
 from models import Base, User, Item, ItemLog 
+from typing import List 
+import os
+from dotenv import load_dotenv
 
-# models.Base.metadata.create_all(bind=engine) Ahora usamos migraciones Alembic
+load_dotenv()
 
 if not firebase_admin._apps:
     cred = credentials.Certificate("serviceAccountKey.json")
@@ -79,9 +82,10 @@ def login_user(user_input: schemas.UserLogin, db: Session = Depends(get_db)):
 
 # --- RUTAS DE ITEMS ---
 
-@app.get("/items", response_model=list[schemas.Item])
-def read_items(current_user: models.User = Depends(get_current_user)):
-    return current_user.items
+@app.get("/items", response_model=List[schemas.Item])
+def read_items(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    items = db.query(models.Item).filter(models.Item.owner_id == current_user.id).order_by(models.Item.position).all()
+    return items
 
 @app.post("/items", response_model=schemas.Item)
 def create_item(item: schemas.ItemCreate, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
@@ -116,7 +120,20 @@ def increment_item(item_id: int, db: Session = Depends(get_db), current_user: mo
     return db_item
 
 # --- (Opcional) EDITAR MANUALMENTE ---
-# Esta la dejamos por si quieres editar el nombre o resetear el contador a 0
+
+@app.put("/items/reorder")
+def reorder_items(item_ids: List[int], db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Recorremos la lista de IDs que nos manda el frontend
+    for index, item_id in enumerate(item_ids):
+        # Buscamos el item y actualizamos su posición
+        db_item = db.query(models.Item).filter(models.Item.id == item_id, models.Item.owner_id == current_user.id).first()
+        if db_item:
+            db_item.position = index
+    
+    db.commit()
+    return {"message": "Orden actualizado"}
+
+# 2. LUEGO LA RUTA GENÉRICA CON ID
 @app.put("/items/{item_id}", response_model=schemas.Item)
 def update_item(
     item_id: int, 
@@ -130,8 +147,6 @@ def update_item(
     if db_item.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="No tienes permiso")
 
-    # Aquí actualizamos lo que venga (titulo o count) pero SIN crear log
-    # Útil para correcciones manuales
     if item_update.title:
         db_item.title = item_update.title
     if item_update.count is not None:
